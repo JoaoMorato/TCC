@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TCC": {
+      "commandName": "Project",
+      "commandLineArgs": "web uniprot_ids.txt 25"
+    }
+  }
+}
