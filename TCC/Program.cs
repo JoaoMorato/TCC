@@ -7,6 +7,7 @@ internal class Program
 {
     private static Semaphore SemSave = new Semaphore(1, 1);
     private static Semaphore SemaphoreConsole = new Semaphore(1, 1);
+    private static Semaphore SemaphoreError = new Semaphore(1, 1);
     private static bool shutdown = false;
     private static bool isRunning = false;
     private static int posiY = 0;
@@ -223,6 +224,7 @@ internal class Program
                         if ((re?.results.Count <= 0 && page == 1) || re == null)
                         {
                             WriteConsole("Nada encontrado: " + id, ConsoleColor.Red);
+                            Error(id);
                             erro += id.Split(',').Length;
                             return;
                         }
@@ -261,19 +263,25 @@ internal class Program
 
                 semaphore.WaitOne();
 
+                List<Fasta> encontrado = new List<Fasta>();
+
                 dados.GroupBy(e => e.geneProductId)
                     .ToList()
                     .ForEach(e =>
-                        retorno.Add(new Fasta
+                        encontrado.Add(new Fasta
                         {
                             Dados = [.. e],
                             FastaId = e.Key.Split(':')[1]
                         })
                     );
 
-                totalDados += dados.Count;
-                certo += dados.Count;
-                erro += id.Split(',').Length - dados.Count;
+                retorno.AddRange(encontrado);
+
+                totalDados += encontrado.Count;
+                certo += encontrado.Count;
+                var erros = split.Where(e => !retorno.Any(j => j.FastaId == e));
+                Error(erros.ToArray());
+                erro += split.Length - encontrado.Count;
 
                 if (retorno.Count >= 5000)
                 {
@@ -361,6 +369,31 @@ internal class Program
         }
         SemSave.Release();
         WriteConsole("Dados recebidos salvo com sucesso...", ConsoleColor.Green);
+    }
+
+    private static async void Error(string txt)
+    {
+        SemaphoreError.WaitOne();
+        try
+        {
+            if(!txt.EndsWith(','))
+                txt += ",";
+            File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FastaIdError.txt"), txt.Replace(',', '\n'));
+        }
+        finally
+        {
+            SemaphoreError.Release();
+        }
+    }
+
+    private static async void Error(string[] txt)
+    {
+        if(txt.Length == 0)
+            return;
+        string a = "";
+        foreach(string s in txt)
+            a += s + ",";
+        Error(a);
     }
 
     private static void FindInFile(List<string> args)
